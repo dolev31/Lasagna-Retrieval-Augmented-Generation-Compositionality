@@ -1,0 +1,405 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{array}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  citecolor=blue!60!black,
+  urlcolor=blue!60!black
+}
+
+% ── Compact layout ──────────────────────────────────────────────
+\setlength{\parskip}{4pt plus 1pt minus 1pt}
+\setlength{\parindent}{0pt}
+
+\title{%
+  \textbf{Pre-Registration:} Interaction Effects, Scaling Laws, and\\
+  Pareto-Optimal Profiles in Retrieval-Augmented\\
+  Generation Pipelines%
+}
+
+\author{%
+  [Authors anonymized for review]%
+}
+
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+\vspace{-1.5em}
+\begin{center}
+\begin{tabular}{@{}rl@{}}
+  \textbf{Date of pre-registration:} & [DATE] \\
+  \textbf{Design matrix SHA-256:}    & \texttt{31a0dc197b46...df1728d6} \\
+  \textbf{Software:}                 & Python 3.11, NumPy 2.3.5, SciPy 1.16.3, seed\,$=$\,42 \\
+\end{tabular}
+\end{center}
+
+% ════════════════════════════════════════════════════════════════
+%  Abstract
+% ════════════════════════════════════════════════════════════════
+
+\begin{abstract}
+\noindent
+We pre-register a controlled factorial evaluation of Retrieval-Augmented
+Generation (RAG) pipeline composition.  The study commits to three
+confirmatory hypotheses, a 242-configuration D-optimal fractional
+factorial design spanning 8 pipeline dimensions, 5 benchmark datasets
+(2{,}300 queries per configuration), and a three-track evaluation
+protocol covering retrieval, end-to-end generation, and hallucination
+resistance.  To our knowledge, this is the first pre-registered
+factorial evaluation of RAG pipeline composition---$4.6\times$ the
+scale of the largest prior controlled RAG
+study~\citep{jin2024flashrag}.  We publish this
+document before experimental data collection to establish hypothesis
+commitment and invite community feedback on model selection, benchmark
+composition, and statistical methodology.
+\end{abstract}
+
+% ════════════════════════════════════════════════════════════════
+\section{Motivation and Rationale}
+% ════════════════════════════════════════════════════════════════
+
+Retrieval-Augmented Generation~\citep{lewis2020rag} has become the
+dominant paradigm for grounding large language models in external
+knowledge.  A rich toolkit of individually validated
+techniques---dense retrieval, hybrid sparse--dense fusion, cross-encoder
+reranking, HyDE~\citep{gao2023hyde}, CRAG~\citep{yan2024crag},
+Self-RAG~\citep{asai2023selfrag}---is available to practitioners, yet
+each technique is evaluated in isolation against a simple baseline.
+Practitioners who combine several techniques simultaneously have no
+empirical basis for predicting whether their gains add, cancel, or
+amplify.
+
+This is not merely a reporting gap.
+\citet{wang2024searching} observe that end-to-end RAG performance
+depends on coordinated pipeline design rather than any single component;
+\citet{chen2025mmoarag} confirm the presence of interaction effects by
+showing that jointly optimized RAG components outperform independently
+tuned ones.  Yet neither work measures the sign, magnitude, or
+domain-dependence of these interactions under controlled factorial
+conditions---precisely the question a practitioner faces when choosing a
+configuration for production.
+
+Pre-registration prevents post-hoc hypothesis mining, a known problem in
+ML benchmarking~\citep{dodge2019importance,bouthillier2021accounting}.
+By committing to hypotheses, analysis plans, and exclusion criteria
+before data collection, we ensure that our confirmatory findings are
+distinguishable from exploratory ones.  We additionally publish this
+document to invite community input on experimental choices that remain
+open (Section~\ref{sec:models}).
+
+% ════════════════════════════════════════════════════════════════
+\section{Pre-Registered Hypotheses}
+\label{sec:hypotheses}
+% ════════════════════════════════════════════════════════════════
+
+\paragraph{H1 --- Interaction Dominance.}
+Two-way interactions between the 8 factorial dimensions explain
+$\geq$20\% of the total variance in faithfulness (RAGAS, 0--1 scale)
+across the factorial sweep, after accounting for main effects.
+Variance is measured via partial~$\eta^2$ in a Type~III ANOVA.
+\textit{Test:} F-test for interaction terms, $\alpha = 0.05$.
+\textit{Disconfirming result:} If interaction terms contribute
+$<$5\% of variance, RAG components are approximately additive and
+can be optimized independently.
+
+\paragraph{H2 --- Pareto Dominance of Balanced Profile.}
+The \textsc{balanced} operational profile is Pareto-dominant over the
+\textsc{max\_quality} profile in $\geq$3 of the 5 benchmark datasets,
+where dominance is defined as strictly higher hypervolume indicator
+(HV) in the 3-objective space (faithfulness, latency, cost).
+\textit{Test:} Wilcoxon signed-rank on per-query faithfulness scores,
+Bonferroni-corrected ($\alpha = 0.05 / 5 = 0.01$ per dataset).
+\textit{Disconfirming result:} If \textsc{max\_quality} dominates in
+$\geq$4/5 datasets, feature saturation and interaction penalties are
+weaker than expected.
+
+\paragraph{H3 --- Corpus Scaling Saturation.}
+For dense-only retrieval, NDCG@10 exhibits power-law saturation:
+a fitted curve $\text{NDCG@10} = a \cdot N^b + c$ yields
+$b < 0.05$ for $N \geq 100$K documents, analogous to the saturation
+behavior observed in neural scaling laws~\citep{kaplan2020scaling}.  For hybrid retrieval, the
+saturation threshold $N^*$ is strictly lower than for dense-only
+retrieval on at least 3/5 benchmarks.
+\textit{Test:} Bootstrap 95\% CI on $b$ (10{,}000 resamples);
+permutation test (10{,}000 permutations) comparing $N^*$.
+\textit{Disconfirming result:} If dense retrieval does not saturate
+($b \geq 0.10$), embedding models scale better than expected with
+corpus size.
+
+% ════════════════════════════════════════════════════════════════
+\section{Experimental Design}
+\label{sec:design}
+% ════════════════════════════════════════════════════════════════
+
+% ── Platform ──────────────────────────────────────────────────
+\subsection{Platform}
+
+\textsc{Lasagna} is a stage-isolated RAG evaluation platform: each
+pipeline stage is implemented behind an abstract base class, and
+configuration changes to one stage do not affect the execution of any
+other stage.  This architectural invariant guarantees that the output
+of stage~$i$ is a deterministic function of the output of stage~$i{-}1$
+and the configuration parameters~$\boldsymbol{\theta}_i$ alone,
+eliminating the coupling confounds that invalidate factorial
+interpretation in conventional RAG implementations.
+
+% ── Candidate Models ──────────────────────────────────────────
+\subsection{Candidate Models}
+\label{sec:models}
+
+All configurations share a single generator LLM (held constant) and a
+single evaluation judge.  We list primary and alternative candidates
+to invite community input before experiments begin.
+
+\begin{table}[h]
+\centering
+\footnotesize
+\caption{Model candidates.  The generator is held constant across all
+  configurations; the judge evaluates all RAGAS metrics.  Embedding
+  models are factorial dimension~D1.}
+\label{tab:models}
+\begin{tabular}{@{}p{2.0cm}p{3.4cm}p{3.8cm}p{4.0cm}@{}}
+\toprule
+\textbf{Role} & \textbf{Primary} & \textbf{Alternatives} & \textbf{Selection rationale} \\
+\midrule
+Generator    & GPT-4.1 (OpenAI)
+             & Claude~3.7 Sonnet (Anthropic), Gemini~2.0 (Google)
+             & Held constant; cost vs.\ capability \\
+\addlinespace
+Judge        & GPT-4o-mini (OpenAI)
+             & Claude~3.5 Haiku (Anthropic), Llama-3-70B (Meta)
+             & Determinism at $T{=}0$; cost for ${\sim}$1.7M calls \\
+\addlinespace
+Embedding    & \multicolumn{2}{l}{MiniLM-L6 (384d), BGE-M3 (1024d), E5-large (1024d), BGE-large (1024d)}
+             & Span lightweight to SOTA multilingual \\
+\addlinespace
+Reranker     & ms-marco-MiniLM-L6-v2
+             & BGE-reranker-v2
+             & Standard BEIR cross-encoder baseline \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+We welcome suggestions on model selection before experiments begin.
+In particular, we are open to: (1)~alternative generator models that
+would increase reproducibility (e.g., open-weight models),
+(2)~additional judge models for cross-validation of faithfulness
+scores, and (3)~embedding models that would expand the capacity range.
+
+% ── Factorial Dimensions ──────────────────────────────────────
+\subsection{Factorial Dimensions}
+
+\begin{table}[h]
+\centering
+\footnotesize
+\caption{The eight factorial dimensions.  Baseline levels (marked~$^*$)
+  are the simplest, lowest-cost options.}
+\label{tab:dimensions}
+\begin{tabular}{@{}llcl@{}}
+\toprule
+Dim & Stage & $k$ & Levels \\
+\midrule
+D1 & Embedding      & 4 & MiniLM-L6$^*$, BGE-M3, E5-large, BGE-large \\
+D2 & Chunking       & 4 & fixed$^*$, semantic, sentence-window, hierarchical \\
+D3 & Enrichment     & 4 & none$^*$, contextual-retrieval, RAPTOR, GraphRAG \\
+D4 & Retrieval      & 3 & dense$^*$, hybrid-BM25, hybrid-SPLADE \\
+D5 & Query aug.     & 5 & none$^*$, HyDE, RAG-Fusion, decomposition, step-back \\
+D6 & Reranking      & 4 & none$^*$, single-CE, ensemble, MMR \\
+D7 & Compression    & 2 & none$^*$, LLMLingua \\
+D8 & Agentic gate   & 4 & none$^*$, CRAG, Self-RAG, Speculative-RAG \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The full factorial comprises
+$4 \times 4 \times 4 \times 3 \times 5 \times 4 \times 2 \times 4 =
+30{,}720$ configurations.
+
+% ── D-Optimal Design ─────────────────────────────────────────
+\subsection{D-Optimal Design}
+
+We reduce 30{,}720 candidates to \textbf{242 configurations} using a
+D-optimal fractional factorial generated by Fedorov coordinate
+exchange~\citep{fedorov1972theory,atkinson2007optimum}.  The model
+matrix includes 1~intercept $+$ 22~main-effect $+$ 209~two-way
+interaction columns $=$ 232 parameters, with 10 residual degrees of
+freedom.  Effect coding ensures orthogonal main
+effects~\citep{box2005statistics,montgomery2017design}.  All 232 model
+terms are estimable (rank verification), and no two-way interaction
+correlates with any representative three-way interaction at
+$|r| > 0.30$.
+
+\textbf{Design matrix SHA-256:}
+\texttt{31a0dc197b46a90819fc9178ea06668444ad9617ff4c8a86f3d557a4df1728d6}
+(seed\,$=$\,42).
+
+% ── Benchmarks ────────────────────────────────────────────────
+\subsection{Benchmark Datasets}
+
+\begin{table}[h]
+\centering
+\footnotesize
+\caption{Planned benchmark datasets.  Total evaluation queries per
+  configuration: 2{,}300.}
+\label{tab:benchmarks}
+\begin{tabular}{@{}llrrl@{}}
+\toprule
+ID & Dataset & Corpus & Eval queries & Relevance \\
+\midrule
+DS1 & MS~MARCO~v1     & 8.8M passages       & 500 sampled & BM25 sparse (TREC) \\
+DS2 & HotpotQA        & 5.2M paragraphs      & 500 sampled & Supporting facts \\
+DS3 & BEIR/FiQA       & 57K posts            & 500 sampled & Crowdsourced \\
+DS4 & BEIR/SciFact    & 5K abstracts         & 300 (all)   & Expert binary \\
+DS5 & CUAD (legal)    & 510 contracts        & 500 sampled & Clause-level \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+These five benchmarks span general web (DS1), multi-hop reasoning
+(DS2), financial opinion QA (DS3), scientific claim verification
+(DS4), and legal contract analysis (DS5), covering diversity in domain,
+relevance granularity, and query
+complexity~\citep{thakur2021beir}.
+
+% ── Metrics ───────────────────────────────────────────────────
+\subsection{Metrics}
+
+\textit{Retrieval:} NDCG@10, MRR, Recall@100.
+\textit{End-to-end:} faithfulness, answer relevance
+(RAGAS~v0.4~\citep{es2023ragas}, judged by GPT-4o-mini at $T{=}0$),
+exact match, token~F1, p50/p95 latency, \$/query.
+\textit{Multi-objective:} hypervolume indicator~(HV) in the
+faithfulness--latency--cost space, reference point
+$(0, 10{,}000\,\text{ms}, \$1.00)$.
+
+% ════════════════════════════════════════════════════════════════
+\section{Statistical Analysis Plan}
+\label{sec:analysis}
+% ════════════════════════════════════════════════════════════════
+
+\paragraph{H1.}
+Type~III ANOVA with the model:
+\begin{small}
+\begin{verbatim}
+faithfulness ~ D1+D2+D3+D4+D5+D6+D7+D8
+             + D1:D2+D1:D3+...+D7:D8   (28 two-way terms)
+\end{verbatim}
+\end{small}
+\vspace{-0.5em}
+Test statistic: F for the joint set of all interaction terms,
+$F(209,\, n_\text{resid})$.  Effect size: partial
+$\eta^2 = \text{SS}_\text{int} / (\text{SS}_\text{int} +
+\text{SS}_\text{resid})$; threshold $\geq 0.20$.
+Post-hoc: Bonferroni ($\alpha = 0.05/28 = 0.00179$) per interaction
+pair.
+
+\paragraph{H2.}
+Wilcoxon signed-rank test on per-query faithfulness
+(\textsc{balanced} vs.\ \textsc{max\_quality}, paired by query).
+Bonferroni across 5~datasets ($\alpha = 0.01$ per dataset).
+HV computed with exact 3D algorithm; objectives normalized to $[0,1]$.
+
+\paragraph{H3.}
+Nonlinear least-squares fit of $\text{NDCG@10} = a \cdot N^b + c$
+using \texttt{scipy.optimize.curve\_fit}.  Confirmed if upper 95\%
+bootstrap CI on $b < 0.05$ for $N \geq 100$K.  Comparison of $N^*$
+via permutation test (10K permutations).
+
+\paragraph{Power.}
+For $n = 500$ queries with $\alpha_\text{corrected} = 0.00179$,
+minimum detectable effect at 80\% power:
+$d \approx 0.168$ (Cohen's $d$).
+
+% ════════════════════════════════════════════════════════════════
+\section{Exclusion Criteria}
+\label{sec:exclusion}
+% ════════════════════════════════════════════════════════════════
+
+\begin{enumerate}[nosep,leftmargin=1.5em]
+  \item Queries exceeding 30\,s wall-clock are excluded and counted.
+  \item Configurations with $>$10\% null-retrieval queries are marked
+    \textsc{Failed} and excluded from the ANOVA.
+  \item Corpus sizes where index construction fails (OOM or $>$24\,h)
+    are excluded from the scaling curve fit.
+  \item Configurations require $\geq$200 valid queries (of 2{,}300)
+    to enter the ANOVA.
+\end{enumerate}
+
+% ════════════════════════════════════════════════════════════════
+\section{Budget, Timeline, and Deviations Protocol}
+\label{sec:budget}
+% ════════════════════════════════════════════════════════════════
+
+\begin{table}[h]
+\centering
+\footnotesize
+\caption{Estimated compute budget.}
+\label{tab:budget}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Experiment & Configs & Queries/config & Est.\ cost (USD) \\
+\midrule
+Factorial sweep     & 242 & 2{,}300 & \$2{,}478 \\
+Scaling experiment  & 15  & 500     & \$30 \\
+Pareto experiment   & 20  & 500     & \$45 \\
+\midrule
+\textbf{Total}      &     &         & $\mathbf{\sim\$2{,}553}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Timeline.}
+All experiments will be run \textit{after} archival of this document.
+Week~1--3: factorial sweep (H1).
+Week~4: scaling experiment (H3).
+Week~4--5: Pareto experiment (H2).
+Week~5--6: analysis and paper writing.
+
+\textbf{Deviations protocol.}
+Any deviation from this pre-registration will be: (1)~documented in a
+dated amendment, (2)~reported transparently in the paper, and
+(3)~accompanied by both the pre-registered analysis and the modified
+analysis so that reviewers can assess the impact of the deviation.
+Any analysis not specified here will be labeled \textit{exploratory}.
+
+% ════════════════════════════════════════════════════════════════
+\section*{Community Input}
+% ════════════════════════════════════════════════════════════════
+
+This pre-registration is published before experimental data collection
+to establish hypothesis commitment and invite community input.
+We welcome feedback on:
+\begin{enumerate}[nosep,leftmargin=1.5em]
+  \item additional hypotheses worth testing within this factorial
+    framework,
+  \item model selection for generation and evaluation
+    (Section~\ref{sec:models}),
+  \item benchmark composition and domain coverage,
+  \item statistical methodology and effect-size thresholds.
+\end{enumerate}
+All community-suggested modifications adopted before experiments begin
+will be documented as amendments; post-experiment suggestions will be
+addressed as exploratory analyses in the companion paper.
+
+% ════════════════════════════════════════════════════════════════
+\bibliographystyle{plainnat}
+\bibliography{preregistration}
+
+\end{document}
