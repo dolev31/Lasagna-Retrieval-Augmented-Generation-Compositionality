@@ -56,25 +56,34 @@
 
 \begin{abstract}
 \noindent
-We pre-register three confirmatory hypotheses that together ask
-whether RAG pipelines can be designed compositionally:
-\textbf{H1} asks whether the eight pipeline components combine
-additively, \textbf{H2} asks whether a single balanced configuration
-sweeps a wider region of the (faithfulness, latency, cost) tradeoff
-envelope than a quality-only configuration, and \textbf{H3} asks
-whether RAG profile rankings flip across a $40\times$ corpus
-scale-up.
-The pre-registered evaluation commits to a 242-configuration
-D-optimal fractional factorial design spanning 8 pipeline dimensions,
-5 benchmark datasets (2{,}300 queries per configuration), and a
+\textbf{In one sentence:} we commit, before collecting data, to
+testing whether a practitioner can build a good Retrieval-Augmented
+Generation (RAG) pipeline by tuning components one at a time on a
+small corpus, the way the literature implicitly assumes.
+We answer this through three pre-registered hypotheses.
+\textbf{H1 (additivity)} asks whether the eight pipeline components
+combine additively, or whether their interactions are large enough
+that single-component ablations cannot be trusted to compose.
+\textbf{H2 (a balanced recipe)} asks whether one fixed
+\textsc{balanced} configuration sweeps a wider region of the
+(faithfulness, latency, cost) tradeoff envelope than a
+quality-only configuration, or whether each deployment must
+hand-tune for its own operating point.
+\textbf{H3 (scaling)} asks whether the small-corpus profile ranking
+that drives most published RAG ablations survives a $40\times$
+corpus scale-up, or whether the small-corpus winner is not the
+production-scale winner.
+The pre-registered study commits to a 242-configuration D-optimal
+fractional factorial design spanning 8 pipeline dimensions, 5
+benchmark datasets (2{,}300 queries per configuration), and a
 three-track evaluation protocol covering retrieval, end-to-end
-generation, and hallucination resistance.  To our knowledge, this is the first pre-registered
-factorial evaluation of RAG pipeline composition---$4.6\times$ the
-scale of the largest prior controlled RAG
-study~\citep{jin2024flashrag}.  We publish this
-document before experimental data collection to establish hypothesis
-commitment and invite community feedback on model selection, benchmark
-composition, and statistical methodology.
+generation, and hallucination resistance.  To our knowledge, this is
+the first pre-registered factorial evaluation of RAG pipeline
+composition---$4.6\times$ the scale of the largest prior controlled
+RAG study~\citep{jin2024flashrag}.  We publish this document before
+experimental data collection to establish hypothesis commitment and
+invite community feedback on model selection, benchmark composition,
+and statistical methodology.
 \end{abstract}
 
 % ════════════════════════════════════════════════════════════════
@@ -406,8 +415,11 @@ $(0, 10{,}000\,\text{ms}, \$1.00)$.
 \label{sec:analysis}
 % ════════════════════════════════════════════════════════════════
 
-\paragraph{H1.}
-Type~III ANOVA with the model:
+\paragraph{H1 (additivity).}
+\emph{Plain reading:} fit one regression that includes every
+pipeline component plus all 28 of their pairwise interactions, then
+ask how much of the leftover variance the interactions explain.
+Model:
 \begin{small}
 \begin{verbatim}
 faithfulness ~ D1+D2+D3+D4+D5+D6+D7+D8
@@ -418,21 +430,31 @@ faithfulness ~ D1+D2+D3+D4+D5+D6+D7+D8
 Test statistic: F for the joint set of all interaction terms,
 $F(209,\, n_\text{resid})$.  Effect size: partial
 $\eta^2 = \text{SS}_\text{int} / (\text{SS}_\text{int} +
-\text{SS}_\text{resid})$; threshold $\geq 0.20$.
-Post-hoc: Bonferroni ($\alpha = 0.05/28 = 0.00179$) per interaction
-pair.
+\text{SS}_\text{resid})$; threshold $\geq 0.20$.  Post-hoc:
+Bonferroni ($\alpha = 0.05/28 = 0.00179$) per interaction pair, so
+that any single interaction we flag as ``large'' has been corrected
+for the 28 simultaneous comparisons.
 
-\paragraph{H2.}
-Wilcoxon signed-rank test on per-query faithfulness
+\paragraph{H2 (a balanced recipe).}
+\emph{Plain reading:} for each query, compare the
+\textsc{balanced} profile's three-objective tradeoff cloud against
+the \textsc{max\_reliable} profile's, and check on how many of the
+five benchmarks \textsc{balanced} sweeps a strictly larger
+hypervolume.  Wilcoxon signed-rank test on per-query faithfulness
 (\textsc{balanced} vs.\ \textsc{max\_reliable}, paired by query).
-Bonferroni across 5~datasets ($\alpha = 0.01$ per dataset).
-HV computed with exact 3D algorithm; objectives normalized to $[0,1]$.
+Bonferroni across 5~datasets ($\alpha = 0.01$ per dataset) so that
+any single ``win'' has been corrected for testing on five datasets
+in parallel.  HV computed with the exact 3D algorithm; objectives
+normalized to $[0,1]$ before integration.
 
-\paragraph{H3.}
-Per-profile nonlinear least-squares fit of
-$\text{NDCG@10}(N) = a \cdot N^b$ for each of the four operational
-profiles (\textsc{Speed}, \textsc{Standard}, \textsc{Balanced},
-\textsc{Max\_Reliable}) using \texttt{scipy.optimize.curve\_fit}.
+\paragraph{H3 (scaling).}
+\emph{Plain reading:} fit a separate scaling curve for each of the
+four profiles and check whether the steepest- and shallowest-
+degrading profiles drift apart fast enough that the small-corpus
+winner is no longer the large-corpus winner.  Per-profile nonlinear
+least-squares fit of $\text{NDCG@10}(N) = a \cdot N^b$ for each of
+\textsc{Speed}, \textsc{Standard}, \textsc{Balanced},
+\textsc{Max\_Reliable} using \texttt{scipy.optimize.curve\_fit}.
 95\% bootstrap CIs on each $b$ from 10{,}000 resamples.  Confirmed
 if (i)~the cross-profile slope range $b_{\max} - b_{\min}$ exceeds
 $0.05$ per decade of corpus growth, and (ii)~Kendall's
