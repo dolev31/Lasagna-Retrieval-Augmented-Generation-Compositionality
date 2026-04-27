@@ -56,13 +56,19 @@
 
 \begin{abstract}
 \noindent
-We pre-register a controlled factorial evaluation of Retrieval-Augmented
-Generation (RAG) pipeline composition.  The study commits to three
-confirmatory hypotheses, a 242-configuration D-optimal fractional
-factorial design spanning 8 pipeline dimensions, 5 benchmark datasets
-(2{,}300 queries per configuration), and a three-track evaluation
-protocol covering retrieval, end-to-end generation, and hallucination
-resistance.  To our knowledge, this is the first pre-registered
+We pre-register three confirmatory hypotheses that together ask
+whether RAG pipelines can be designed compositionally:
+\textbf{H1} asks whether the eight pipeline components combine
+additively, \textbf{H2} asks whether a single balanced configuration
+sweeps a wider region of the (faithfulness, latency, cost) tradeoff
+envelope than a quality-only configuration, and \textbf{H3} asks
+whether RAG profile rankings flip across a $40\times$ corpus
+scale-up.
+The pre-registered evaluation commits to a 242-configuration
+D-optimal fractional factorial design spanning 8 pipeline dimensions,
+5 benchmark datasets (2{,}300 queries per configuration), and a
+three-track evaluation protocol covering retrieval, end-to-end
+generation, and hallucination resistance.  To our knowledge, this is the first pre-registered
 factorial evaluation of RAG pipeline composition---$4.6\times$ the
 scale of the largest prior controlled RAG
 study~\citep{jin2024flashrag}.  We publish this
@@ -109,39 +115,137 @@ open (Section~\ref{sec:models}).
 \label{sec:hypotheses}
 % ════════════════════════════════════════════════════════════════
 
-\paragraph{H1 --- Interaction Dominance.}
-Two-way interactions between the 8 factorial dimensions explain
-$\geq$20\% of the total variance in faithfulness (RAGAS, 0--1 scale)
-across the factorial sweep, after accounting for main effects.
-Variance is measured via partial~$\eta^2$ in a Type~III ANOVA.
-\textit{Test:} F-test for interaction terms, $\alpha = 0.05$.
-\textit{Disconfirming result:} If interaction terms contribute
-$<$5\% of variance, RAG components are approximately additive and
-can be optimized independently.
+We pre-register three hypotheses that together ask whether RAG
+pipelines can be designed compositionally, picking up the gap
+identified in Section~1.  \textbf{H1} asks the
+\emph{structural} question: do the eight pipeline components combine
+additively, or do they interact non-trivially?  If they interact, the
+implicit assumption behind every single-component ablation in the
+literature fails.  \textbf{H2} asks the \emph{design} question:
+assuming components do interact, can a single fixed configuration
+still serve practitioners across the (faithfulness, latency, cost)
+tradeoff space, or must each deployment hand-tune for its own operating
+point?  \textbf{H3} asks the \emph{scaling} question: do the answers
+to H1 and H2 survive a $40\times$ scale-up of the corpus, or are
+small-corpus best practices misleading at production scale?  The three
+together determine whether a fixed ``best-practice RAG pipeline'' is
+even a coherent target.
 
-\paragraph{H2 --- Pareto Dominance of Balanced Profile.}
-The \textsc{balanced} operational profile is Pareto-dominant over the
-\textsc{max\_quality} profile in $\geq$3 of the 5 benchmark datasets,
-where dominance is defined as strictly higher hypervolume indicator
-(HV) in the 3-objective space (faithfulness, latency, cost).
-\textit{Test:} Wilcoxon signed-rank on per-query faithfulness scores,
-Bonferroni-corrected ($\alpha = 0.05 / 5 = 0.01$ per dataset).
-\textit{Disconfirming result:} If \textsc{max\_quality} dominates in
-$\geq$4/5 datasets, feature saturation and interaction penalties are
-weaker than expected.
+A summary of the three before the formal statements:
 
-\paragraph{H3 --- Corpus Scaling Saturation.}
-For dense-only retrieval, NDCG@10 exhibits power-law saturation:
-a fitted curve $\text{NDCG@10} = a \cdot N^b + c$ yields
-$b < 0.05$ for $N \geq 100$K documents, analogous to the saturation
-behavior observed in neural scaling laws~\citep{kaplan2020scaling}.  For hybrid retrieval, the
-saturation threshold $N^*$ is strictly lower than for dense-only
-retrieval on at least 3/5 benchmarks.
-\textit{Test:} Bootstrap 95\% CI on $b$ (10{,}000 resamples);
-permutation test (10{,}000 permutations) comparing $N^*$.
-\textit{Disconfirming result:} If dense retrieval does not saturate
-($b \geq 0.10$), embedding models scale better than expected with
-corpus size.
+\begin{table}[h]
+\centering
+\footnotesize
+\begin{tabular}{@{}p{0.8cm}p{4.4cm}p{4.4cm}p{4.0cm}@{}}
+\toprule
+& Research question & What confirming rejects & Pre-registered test \\
+\midrule
+\textbf{H1} & Do components combine additively? & Single-component ablation as evidence & $\eta^2 \geq 0.20$, Type-III ANOVA F-test \\
+\addlinespace
+\textbf{H2} & Does a balanced configuration sweep a wider tradeoff envelope? & ``You must pick one axis to optimize'' & Hypervolume, Wilcoxon signed-rank \\
+\addlinespace
+\textbf{H3} & Do RAG profile rankings flip with corpus scale? & Small-corpus ablations predict production deployment & Per-profile power-law slopes, bootstrap CIs, Kendall's $\tau$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{H1 --- Components do not combine additively.}
+
+\textit{Research question.} Do the eight pipeline components combine
+additively, or do non-trivial interactions arise that violate the
+additivity assumption behind isolated-component ablations?
+
+\textit{Pre-registered claim.} Two-way interactions between the eight
+factorial dimensions explain $\geq 20\%$ of the variance in
+faithfulness (RAGAS, 0--1 scale) after main effects are removed.
+Variance is reported as \emph{partial $\eta^2$} --- the share of
+residual variance (after main effects) attributed to interaction
+terms --- in a \emph{Type-III ANOVA}, an ANOVA decomposition that
+estimates each term's contribution after partialling out all others
+and is robust to unbalanced designs.  The 20\% bar is Cohen's ``large
+effect'' threshold for a single interaction term~\citep{cohen1988statistical}.
+
+\textit{Pre-registered test.} F-test on the joint set of all 28
+two-way interaction terms, $\alpha = 0.05$.  Post-hoc Bonferroni
+($\alpha = 0.05 / 28 = 0.00179$) per interaction pair.
+
+\textit{What confirming and rejecting mean.} \emph{Confirming~H1}
+falsifies the additivity assumption behind most single-component RAG
+ablations in the literature: a designer cannot tune one component in
+isolation and trust the gain to compose with another.
+\emph{Rejecting~H1} (interaction terms contribute $<$5\% of variance)
+means RAG components are approximately additive within the precision
+of our 242-config sweep, and isolated ablations remain a defensible
+practice.
+
+\paragraph{H2 --- A balanced operating point exists.}
+
+\textit{Research question.} Given that components interact, can a
+single fixed configuration sweep a wider region of the (faithfulness,
+latency, cost) tradeoff space than a quality-only configuration, or
+must practitioners give up an axis to gain another?
+
+\textit{Pre-registered claim.} The \textsc{balanced} operational
+profile exhibits a strictly higher \emph{hypervolume indicator} (HV)
+than the \textsc{max\_reliable} profile on $\geq 3$ of the 5 benchmark
+datasets.  Hypervolume is the multi-objective generalization of
+area-under-the-curve: the volume of the
+$(\text{faithfulness}{\uparrow}, \text{latency}{\downarrow}, \text{cost}{\downarrow})$
+region dominated by the profile's per-query tradeoff cloud, with
+larger meaning a better envelope.
+
+\textit{Pre-registered test.} Wilcoxon signed-rank --- a non-parametric
+paired-sample test that does not assume normality --- on per-query
+faithfulness scores (paired by query), Bonferroni-corrected across
+the 5 datasets ($\alpha = 0.05 / 5 = 0.01$ per dataset).  HV is
+computed with the exact 3D algorithm; objectives are normalized to
+$[0,1]$ before the volume integration.
+
+\textit{What confirming and rejecting mean.} \emph{Confirming~H2}
+says a single fixed configuration can serve practitioners who do not
+want to give up an axis: published profile recipes (e.g., \textsc{Balanced})
+generalize across deployments.  \emph{Rejecting~H2}
+(\textsc{max\_reliable} dominates in $\geq 4 / 5$ datasets) means
+production RAG requires per-deployment tuning to its own tradeoff
+preference, and our published profile recipes will not generalize.
+
+\paragraph{H3 --- Profile rankings flip with corpus scale.}
+
+\textit{Research question.} Does the best-performing RAG profile at
+small corpus (where most published RAG ablations live) remain the
+best-performing profile at production scale, or do profile rankings
+change with corpus size?
+
+\textit{Pre-registered claim.} Fitting NDCG@10 as a power law
+$\text{NDCG@10}(N) = a \cdot N^{b}$ separately for each of the four
+operational profiles (\textsc{Speed}, \textsc{Standard},
+\textsc{Balanced}, \textsc{Max\_Reliable}), the cross-profile range
+$b_{\max} - b_{\min}$ exceeds $0.05$ per decade of corpus growth
+(i.e., the steepest- and shallowest-degrading profiles differ by at
+least $5\%$ relative NDCG@10 per $10\times$ corpus increase),
+analogous to the saturation behavior observed in neural scaling
+laws~\citep{kaplan2020scaling}.  Equivalently, the profile-rank
+ordering at the smallest tested corpus ($5$K) differs from the
+ordering at $200$K on $\geq 1$ benchmark.
+
+\textit{Pre-registered test.} Per-profile nonlinear least-squares
+fit (\texttt{scipy.optimize.curve\_fit}); 95\% bootstrap CIs on each
+$b$ from 10{,}000 resamples.  Profile-pair slope differences tested
+via \emph{permutation test} (10{,}000 shuffles, $\alpha = 0.05$) ---
+a non-parametric significance test that constructs the null
+distribution by random label shuffling, valid without distributional
+assumptions.  Profile-rank stability tested via Kendall's $\tau$
+between the $5$K and $200$K profile orderings.
+
+\textit{What confirming and rejecting mean.} \emph{Confirming~H3}
+means small-corpus ablations cannot reliably predict production-scale
+deployment choices: profile selection requires re-validation at the
+deployment's target corpus size, and the field's reliance on
+$\leq 50$K-corpus benchmarks is methodologically suspect for
+deployment decisions.  \emph{Rejecting~H3} (slope range $\leq 0.02$
+per decade, $\tau = 1$ on every benchmark) means small-corpus
+benchmarks generalize, and the small-corpus best practice is also the
+large-corpus best practice.
 
 % ════════════════════════════════════════════════════════════════
 \section{Experimental Design}
@@ -236,7 +340,11 @@ $4 \times 4 \times 4 \times 3 \times 5 \times 4 \times 2 \times 4 =
 \subsection{D-Optimal Design}
 
 We reduce 30{,}720 candidates to \textbf{242 configurations} using a
-D-optimal fractional factorial generated by Fedorov coordinate
+\emph{D-optimal fractional factorial} --- a design that selects a
+subset of rows from the full factorial to give the most precise
+estimates of every main effect and pairwise interaction, formally by
+maximizing $\det(X^{\top} X)$ for the model matrix $X$ --- generated
+by Fedorov coordinate
 exchange~\citep{fedorov1972theory,atkinson2007optimum}.  The model
 matrix includes 1~intercept $+$ 22~main-effect $+$ 209~two-way
 interaction columns $=$ 232 parameters, with 10 residual degrees of
@@ -285,8 +393,12 @@ complexity~\citep{thakur2021beir}.
 \textit{End-to-end:} faithfulness, answer relevance
 (RAGAS~v0.4~\citep{es2023ragas}, judged by GPT-4o-mini at $T{=}0$),
 exact match, token~F1, p50/p95 latency, \$/query.
-\textit{Multi-objective:} hypervolume indicator~(HV) in the
-faithfulness--latency--cost space, reference point
+\textit{Multi-objective:} \emph{hypervolume indicator} (HV) ---
+the volume of the
+$(\text{faithfulness}{\uparrow}, \text{latency}{\downarrow}, \text{cost}{\downarrow})$
+region dominated by a profile's per-query tradeoff cloud, the
+multi-objective generalization of area-under-the-curve --- in the
+faithfulness--latency--cost space, with reference point
 $(0, 10{,}000\,\text{ms}, \$1.00)$.
 
 % ════════════════════════════════════════════════════════════════
@@ -312,15 +424,21 @@ pair.
 
 \paragraph{H2.}
 Wilcoxon signed-rank test on per-query faithfulness
-(\textsc{balanced} vs.\ \textsc{max\_quality}, paired by query).
+(\textsc{balanced} vs.\ \textsc{max\_reliable}, paired by query).
 Bonferroni across 5~datasets ($\alpha = 0.01$ per dataset).
 HV computed with exact 3D algorithm; objectives normalized to $[0,1]$.
 
 \paragraph{H3.}
-Nonlinear least-squares fit of $\text{NDCG@10} = a \cdot N^b + c$
-using \texttt{scipy.optimize.curve\_fit}.  Confirmed if upper 95\%
-bootstrap CI on $b < 0.05$ for $N \geq 100$K.  Comparison of $N^*$
-via permutation test (10K permutations).
+Per-profile nonlinear least-squares fit of
+$\text{NDCG@10}(N) = a \cdot N^b$ for each of the four operational
+profiles (\textsc{Speed}, \textsc{Standard}, \textsc{Balanced},
+\textsc{Max\_Reliable}) using \texttt{scipy.optimize.curve\_fit}.
+95\% bootstrap CIs on each $b$ from 10{,}000 resamples.  Confirmed
+if (i)~the cross-profile slope range $b_{\max} - b_{\min}$ exceeds
+$0.05$ per decade of corpus growth, and (ii)~Kendall's
+$\tau < 1$ between the $5$K and $200$K profile orderings on
+$\geq 1$ benchmark.  Pairwise slope differences tested via
+permutation test (10{,}000 shuffles, $\alpha = 0.05$).
 
 \paragraph{Power.}
 For $n = 500$ queries with $\alpha_\text{corrected} = 0.00179$,
